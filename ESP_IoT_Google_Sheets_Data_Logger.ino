@@ -59,12 +59,14 @@ const int   daylightOffset_sec = 3600;
 
 // Gscript ID and required credentials
 const char* host = "script.google.com";      
-const char* GScriptId = "AKfycbwtsgdoqdvuy_B8lP3UovhuDfOdVBavK0VKvdhcqVdmpaV41CqRdq5_i1Tli7Wf3eliUg";
+const char* GScriptId = "AKfycbzSlEInj55bkr4yJwK2IEZwLdrSJue3ZF_WXcqN-6xL7HvE-_4xLgG7xQT86J-62DglTw";
 const int httpsPort = 443;      
 
 String url = String("/macros/s/") + GScriptId + "/exec";
 
 HTTPSRedirect* client = nullptr;
+
+long  iSeconds = 30;
 
 
 // --------------------------------------------------------------------------------------------------------
@@ -106,8 +108,8 @@ void loop()
   // Post the data to google spreadsheet
   postData(humi, tempC);
   getData();
-  
-  delay(30000);                                     // Time delay of 30 sec 
+
+  delay(iSeconds * 1000);                                     // Time delay of 30 sec 
 }
 // --------------------------------------------------------------------------------------------------------
 
@@ -254,9 +256,18 @@ void getData()
   client->GET(urlFinal, host);
   String payload = client->getResponseBody(); 
 //#if DEBUG  
-  Serial.println("Payload:");
-  Serial.println(payload); 
+  Serial.print("Payload: [");
+  Serial.print(payload); 
+  Serial.println("]"); 
 //#endif
+
+  long iTmp = atoi(payload.c_str());
+  if (iTmp > 1)
+    iSeconds = iTmp;
+#if DEBUG  
+  Serial.println(iTmp);
+#endif
+   
   client->stop();   
 }
 
