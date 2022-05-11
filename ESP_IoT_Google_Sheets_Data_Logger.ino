@@ -19,8 +19,17 @@
 
  **************************************************************************/
 
-#define PROGRAM "ESP8266 IoT Data Logger to Google Sheets"
+#define PROGRAM "ESP IoT Google Sheets Data Logger"
+#ifdef ESP32
+#define PROCESSOR "  for ESP32"
+#endif
+#ifdef  ESP8266
+#define PROCESSOR "  for ESP8266"
+#endif
 #define VERSION "Ver 0.2 2022-05-09"
+
+
+//#define DEBUG 1
 
 #ifdef ESP8266
 #include <ESP8266WiFi.h>
@@ -59,7 +68,7 @@ const int   daylightOffset_sec = 3600;
 
 // Gscript ID and required credentials
 const char* host = "script.google.com";      
-const char* GScriptId = "AKfycbzSlEInj55bkr4yJwK2IEZwLdrSJue3ZF_WXcqN-6xL7HvE-_4xLgG7xQT86J-62DglTw";
+const char* GScriptId = "AKfycbzyxwC2PC6Z6UqSV3wp-I2gl73e9x_3IDPm-C94CvB1ykHVKJGTd8oqtfyxZFp2oOADtQ";
 const int httpsPort = 443;      
 
 String url = String("/macros/s/") + GScriptId + "/exec";
@@ -75,7 +84,11 @@ void setup() {
   delay(1000); 
 
   Serial.println(PROGRAM);
+  Serial.println(PROCESSOR);
   Serial.println(VERSION);
+
+  pinMode(2, OUTPUT);
+  digitalWrite(2, HIGH);
 
   dht_sensor.begin(); // initialize the DHT sensor
                            
@@ -84,6 +97,11 @@ void setup() {
 
   // Init and get the time
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
+  // After configTime() call the ESP32 will return 69 
+  // for the year unless there is a delay before getting the time
+  delay(1000);
+
   printLocalTime(); 
 }
 
@@ -92,9 +110,12 @@ void loop()
   float humi  = dht_sensor.readHumidity();
   float tempC = dht_sensor.readTemperature();
 
+  bool bGoodData = true;
+  
   // check whether the reading is successful or not
   if ( isnan(tempC) || isnan(humi)) {
     Serial.println("Failed to read from DHT sensor!");
+    bGoodData = false;
   } else {
     Serial.print("Humidity: ");
     Serial.print(humi);
@@ -106,9 +127,16 @@ void loop()
   }
 
   // Post the data to google spreadsheet
-  postData(humi, tempC);
-  getData();
+  digitalWrite(2, LOW);
+  if (bGoodData)
+    postData(humi, tempC);
 
+#ifdef ESP8266    
+  getData();
+#endif
+
+  digitalWrite(2, HIGH);
+  
   delay(iSeconds * 1000);                                     // Time delay of 30 sec 
 }
 // --------------------------------------------------------------------------------------------------------
@@ -218,7 +246,7 @@ void postData(float humi, float tempC)
   Serial.println("Payload:");
   Serial.println(payload); 
 #endif
-  client->stop();    
+  //client->stop();    
 }
 
 void getData()
@@ -254,16 +282,17 @@ void getData()
   }
 
   client->GET(urlFinal, host);
+
   String payload = client->getResponseBody(); 
-//#if DEBUG  
+#if DEBUG  
   Serial.print("Payload: [");
   Serial.print(payload); 
   Serial.println("]"); 
-//#endif
+#endif
 
   long iTmp = atoi(payload.c_str());
-  if (iTmp > 1)
-    iSeconds = iTmp;
+  if (iTmp > 4)
+    iSeconds = iTmp - 5;
 #if DEBUG  
   Serial.println(iTmp);
 #endif
