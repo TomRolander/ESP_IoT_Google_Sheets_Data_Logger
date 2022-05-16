@@ -75,11 +75,12 @@ String url = String("/macros/s/") + GScriptId + "/exec";
 
 HTTPSRedirect* client = nullptr;
 
-long  iSeconds = 30;
-
+static long lSeconds = 30;
+static long lPreviousMilliseconds = 0;
 
 // --------------------------------------------------------------------------------------------------------
-void setup() {
+void setup()
+{
   Serial.begin(115200);  
   delay(1000); 
 
@@ -102,11 +103,43 @@ void setup() {
   // for the year unless there is a delay before getting the time
   delay(1000);
 
+#if DEBUG      
   printLocalTime(); 
+#endif
+
+  bool bGoodData = false;
+  
+  while (bGoodData == false)
+  {
+    float humi  = dht_sensor.readHumidity();
+    float tempC = dht_sensor.readTemperature();
+  
+    // check whether the reading is successful or not
+    if ( isnan(tempC) || isnan(humi)) {
+      Serial.println("Failed to read from DHT sensor!");
+      bGoodData = false;
+      delay(2000);
+    } 
+    else
+    {
+#if DEBUG      
+      Serial.print("Humidity: ");
+      Serial.print(humi);
+      Serial.print("%");
+      Serial.print("  |  ");
+      Serial.print("Temperature: ");
+      Serial.print(tempC);
+      Serial.println("°C");
+#endif      
+      bGoodData = true;
+    }
+  }
 }
 
 void loop()
 {
+  lPreviousMilliseconds = millis();
+  
   float humi  = dht_sensor.readHumidity();
   float tempC = dht_sensor.readTemperature();
 
@@ -116,7 +149,10 @@ void loop()
   if ( isnan(tempC) || isnan(humi)) {
     Serial.println("Failed to read from DHT sensor!");
     bGoodData = false;
-  } else {
+  } 
+  else 
+  {
+#if DEBUG    
     Serial.print("Humidity: ");
     Serial.print(humi);
     Serial.print("%");
@@ -124,20 +160,31 @@ void loop()
     Serial.print("Temperature: ");
     Serial.print(tempC);
     Serial.println("°C");
+#endif    
   }
 
   // Post the data to google spreadsheet
   digitalWrite(2, LOW);
+
+  long lBefore = millis();
+    
   if (bGoodData)
     postData(humi, tempC);
 
 #ifdef ESP8266    
   getData();
 #endif
-
-  digitalWrite(2, HIGH);
   
-  delay(iSeconds * 1000);                                     // Time delay of 30 sec 
+  digitalWrite(2, HIGH);
+
+  while (true)
+  {
+    if (millis() > (lPreviousMilliseconds + (lSeconds * 1000L)))
+    {
+      break;
+    }
+    delay(100);
+  }
 }
 // --------------------------------------------------------------------------------------------------------
 
@@ -291,8 +338,8 @@ void getData()
 #endif
 
   long iTmp = atoi(payload.c_str());
-  if (iTmp > 4)
-    iSeconds = iTmp - 5;
+  if (iTmp > 0)
+    lSeconds = iTmp;
 #if DEBUG  
   Serial.println(iTmp);
 #endif
